@@ -1,0 +1,2 @@
+importit as e｝from"./index-BseuoNF9.js"；var t=e（）； function n（） ｛return（O,t.jsx）（'iframe'，｛src：'/shop.html'，title：“星際商店 Interstellar Shop'，className：'fixed
+inset-0 h-full w-full border-0}) }export{n as component};

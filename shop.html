@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>星際商店 Interstellar Shop</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #050714;
+      background-image: 
+        radial-gradient(circle at 15% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 35%),
+        radial-gradient(circle at 85% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 35%),
+        radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.1) 0%, transparent 50%);
+      background-attachment: fixed;
+    }
+    .orbitron { font-family: 'Orbitron', sans-serif; }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    .glass-card-glow {
+      background: rgba(20, 27, 54, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      box-shadow: 0 0 25px rgba(99, 102, 241, 0.2);
+    }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.4); border-radius: 9999px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.6); }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col custom-scrollbar antialiased">
+
+  <!-- Toast Notification Header -->
+  <div id="toast" class="fixed top-5 right-5 z-50 transform translate-x-full opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="flex items-center gap-3 px-5 py-3.5 rounded-xl glass-card-glow text-white shadow-2xl border border-indigo-500/50">
+      <div id="toast-icon" class="p-1 bg-indigo-500/20 rounded-lg text-indigo-400">
+        <i data-lucide="info" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <p id="toast-title" class="font-bold text-sm text-indigo-200">通知</p>
+        <p id="toast-msg" class="text-xs text-slate-300">操作成功</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Navigation Header -->
+  <header class="sticky top-0 z-40 glass-card border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-20">
+        <!-- Logo -->
+        <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('shop')">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 p-0.5 shadow-lg shadow-indigo-500/30">
+            <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+              <i data-lucide="rocket" class="w-6 h-6 text-indigo-400"></i>
+            </div>
+          </div>
+          <div>
+            <h1 class="font-black text-xl tracking-wider orbitron bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
+              星際商店
+            </h1>
+            <p class="text-[10px] text-indigo-400/80 orbitron tracking-widest uppercase">Interstellar Shop</p>
+          </div>
+        </div>
+
+        <!-- User Controls / Stats -->
+        <div id="user-header-info" class="hidden flex items-center gap-3 sm:gap-6">
+          <!-- Class & Student ID Tag -->
+          <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+            <i data-lucide="user" class="w-4 h-4 text-slate-400"></i>
+            <span class="text-slate-400">用戶：</span>
+            <span id="header-user-tag" class="font-bold text-indigo-300">3A (12)</span>
+          </div>
+
+          <!-- Balance Pill -->
+          <div class="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 shadow-inner">
+            <span class="text-lg">🪙</span>
+            <span id="user-coin-balance" class="font-bold orbitron text-base">0</span>
+            <span class="text-xs text-amber-400/70 font-medium">星幣</span>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex items-center gap-2">
+            <button onclick="openSellModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-bold transition">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-indigo-400"></i>
+              <span class="hidden sm:inline">我要寄賣</span>
+            </button>
+            <button onclick="switchTab('seller')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-bold transition">
+              <i data-lucide="store" class="w-4 h-4 text-purple-400"></i>
+              <span class="hidden sm:inline">個人中心</span>
+            </button>
+            <button id="admin-tab-btn" onclick="switchTab('admin')" class="hidden flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 text-xs font-bold transition">
+              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+              <span class="hidden sm:inline">總中心</span>
+            </button>
+            <button onclick="openCartModal()" class="relative p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700 transition">
+              <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+              <span id="cart-badge" class="hidden absolute -top-1.5 -right-1.5 w-5 h-5 bg-pink-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-slate-950">0</span>
+            </button>
+            <button onclick="logout()" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition" title="登出">
+              <i data-lucide="log-out" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Login Modal / Overlay -->
+  <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl">
+    <div class="glass-card-glow max-w-md w-full p-8 rounded-3xl relative overflow-hidden border border-indigo-500/30 shadow-2xl">
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-400 mb-4 shadow-lg shadow-indigo-500/20">
+          <i data-lucide="atom" class="w-10 h-10 animate-spin-slow"></i>
+        </div>
+        <h2 class="text-2xl font-black orbitron text-white tracking-wide">進入星際商店</h2>
+        <p class="text-xs text-slate-400 mt-2">請輸入班別及學號登入專屬星際帳戶</p>
+      </div>
+
+      <form id="login-form" onsubmit="handleLogin(event)" class="space-y-5">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">班別 (Class)</label>
+          <input type="text" id="input-class" required placeholder="例如: 3A" class="w-full px-4 py-3.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">學號 (Student ID)</label>
+          <input type="text" id="input-studentid" required placeholder="例如: 12" class="w-full px-4 py-3.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm">
+        </div>
+        <button type="submit" class="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 hover:opacity-95 transition transform active:scale-98 flex items-center justify-center gap-2">
+          <span>探索商店 / 登入</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main View Area -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
+    <!-- Tab 1: Shop Marketplace -->
+    <section id="view-shop" class="space-y-8">
+      <!-- Banner / Search Bar -->
+      <div class="glass-card p-6 sm:p-8 rounded-3xl relative overflow-hidden border border-slate-800">
+        <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-medium mb-3">
+              <span>✨ 學生自主 C2C & B2C 寄賣平台</span>
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-black text-white">熱門星際裝備與寄賣物品</h2>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">選購同學寄賣商品或官方物資，賺取星幣互通有無！</p>
+          </div>
+          <!-- Filter / Search -->
+          <div class="flex flex-col sm:flex-row items-center gap-3">
+            <div class="relative w-full sm:w-64">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500"></i>
+              <input type="text" id="search-input" oninput="renderShop()" placeholder="搜尋商品..." class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+            </div>
+            <select id="category-filter" onchange="renderShop()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-indigo-500">
+              <option value="ALL">全部類別</option>
+              <option value="C2C">學生二手寄賣</option>
+              <option value="OFFICIAL">學校紀念品</option>
+              <option value="STATIONERY">文具用品</option>
+              <option value="SNACK">零食飲品</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Catalog Grid -->
+      <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- Products generated by JS -->
+      </div>
+    </section>
+
+    <!-- Tab 2: Personal Seller Center -->
+    <section id="view-seller" class="hidden space-y-8">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 glass-card p-6 rounded-3xl border border-slate-800">
+        <div>
+          <h2 class="text-2xl font-black text-white">個人賣家中心</h2>
+          <p class="text-xs text-slate-400 mt-1">查看寄賣物品、剩餘庫存及賺取的星幣</p>
+        </div>
+        <button onclick="openSellModal()" class="px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/30">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>寄賣新商品</span>
+        </button>
+      </div>
+
+      <!-- Seller Stats Summary -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div class="glass-card p-5 rounded-2xl border border-slate-800">
+          <p class="text-xs text-slate-400 font-medium">金幣餘額</p>
+          <p class="text-2xl font-black orbitron text-amber-400 mt-2">🪙 <span id="seller-stat-coins">0</span></p>
+        </div>
+        <div class="glass-card p-5 rounded-2xl border border-slate-800">
+          <p class="text-xs text-slate-400 font-medium">目前寄賣商品</p>
+          <p class="text-2xl font-black orbitron text-indigo-400 mt-2"><span id="seller-stat-items">0</span> 件</p>
+        </div>
+        <div class="glass-card p-5 rounded-2xl border border-slate-800">
+          <p class="text-xs text-slate-400 font-medium">已成功售出</p>
+          <p class="text-2xl font-black orbitron text-emerald-400 mt-2"><span id="seller-stat-sales">0</span> 次</p>
+        </div>
+      </div>
+
+      <!-- My Listings Table -->
+      <div class="glass-card rounded-3xl border border-slate-800 overflow-hidden">
+        <div class="p-6 border-b border-slate-800/80 flex items-center justify-between">
+          <h3 class="font-bold text-white text-base">我寄賣的商品</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider">
+              <tr>
+                <th class="px-6 py-4">商品資訊</th>
+                <th class="px-6 py-4">售價</th>
+                <th class="px-6 py-4">剩餘庫存</th>
+                <th class="px-6 py-4">狀態</th>
+                <th class="px-6 py-4 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="seller-items-table" class="divide-y divide-slate-800/60">
+              <!-- JS Injected -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- My Purchase History -->
+      <div class="glass-card rounded-3xl border border-slate-800 overflow-hidden">
+        <div class="p-6 border-b border-slate-800/80">
+          <h3 class="font-bold text-white text-base">我的個人購買紀錄</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider">
+              <tr>
+                <th class="px-6 py-4">訂單號 / 時間</th>
+                <th class="px-6 py-4">購買項目</th>
+                <th class="px-6 py-4">消費金額</th>
+              </tr>
+            </thead>
+            <tbody id="my-orders-table" class="divide-y divide-slate-800/60">
+              <!-- JS Injected -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Admin Secret View -->
+    <section id="view-admin" class="hidden space-y-8">
+      <div class="glass-card-glow p-6 rounded-3xl border border-emerald-500/30">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl">
+            <i data-lucide="shield" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl font-black text-white orbitron">星際控制總中心 (管理員權限)</h2>
+            <p class="text-xs text-slate-300 mt-0.5">全站商品維護、上/下架調整及學生交易訂單監控</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Tabs Submenu -->
+      <div class="flex border-b border-slate-800 space-x-6 text-sm">
+        <button onclick="switchAdminSubTab('inventory')" id="admin-tab-inv" class="pb-3 text-indigo-400 border-b-2 border-indigo-500 font-bold">全站商品庫存與狀態</button>
+        <button onclick="switchAdminSubTab('orders')" id="admin-tab-ord" class="pb-3 text-slate-400 border-b-2 border-transparent font-bold">學生購買及電郵紀錄</button>
+      </div>
+
+      <!-- Admin Subtab 1: Inventory Management -->
+      <div id="admin-subview-inv" class="space-y-6">
+        <div class="flex justify-end">
+          <button onclick="openSellModal(true)" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>新增官方商品</span>
+          </button>
+        </div>
+
+        <div class="glass-card rounded-3xl border border-slate-800 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-800 uppercase">
+                <tr>
+                  <th class="px-6 py-4">商品名稱 / 圖示</th>
+                  <th class="px-6 py-4">賣家類型</th>
+                  <th class="px-6 py-4">價格 (金幣)</th>
+                  <th class="px-6 py-4">庫存</th>
+                  <th class="px-6 py-4">狀態</th>
+                  <th class="px-6 py-4 text-right">管理操作</th>
+                </tr>
+              </thead>
+              <tbody id="admin-inventory-table" class="divide-y divide-slate-800/60">
+                <!-- JS Injected -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Subtab 2: Order Logs & Emails -->
+      <div id="admin-subview-ord" class="hidden space-y-6">
+        <div class="glass-card rounded-3xl border border-slate-800 overflow-hidden">
+          <div class="p-6 border-b border-slate-800/80 flex justify-between items-center">
+            <h3 class="font-bold text-white text-base">學生購買及電郵紀錄</h3>
+            <span id="admin-order-count" class="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-full">0 筆紀錄</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-800 uppercase">
+                <tr>
+                  <th class="px-6 py-4">訂單號 / 時間</th>
+                  <th class="px-6 py-4">買家 (班別/學號)</th>
+                  <th class="px-6 py-4">電郵地址 (Email)</th>
+                  <th class="px-6 py-4">購買項目</th>
+                  <th class="px-6 py-4">消費金額</th>
+                </tr>
+              </thead>
+              <tbody id="admin-orders-table" class="divide-y divide-slate-800/60">
+                <!-- JS Injected -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal: Cart / Checkout -->
+  <div id="cart-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+    <div class="glass-card max-w-lg w-full rounded-3xl border border-slate-800 p-6 sm:p-8 space-y-6">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div class="flex items-center gap-2 text-white font-black text-lg">
+          <i data-lucide="shopping-cart" class="w-5 h-5 text-indigo-400"></i>
+          <span>星際購物籃</span>
+        </div>
+        <button onclick="closeCartModal()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Items List -->
+      <div id="cart-items-container" class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+        <!-- JS Injected -->
+      </div>
+
+      <div class="border-t border-slate-800 pt-4 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase mb-2">通知電郵地址 (Email)</label>
+          <input type="email" id="cart-email" required placeholder="example@school.edu.hk" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-slate-400 font-medium">應付金幣金額</span>
+          <span class="font-black orbitron text-xl text-amber-400">🪙 <span id="cart-total-price">0</span></span>
+        </div>
+
+        <button onclick="checkoutCart()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition">
+          用金幣付款結帳
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add / Sell Product -->
+  <div id="sell-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+    <div class="glass-card max-w-lg w-full rounded-3xl border border-slate-800 p-6 sm:p-8 space-y-6">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <h3 id="sell-modal-title" class="font-bold text-white text-lg">寄賣新商品</h3>
+        <button onclick="closeSellModal()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="sell-form" onsubmit="handleSellSubmit(event)" class="space-y-4">
+        <input type="hidden" id="sell-is-admin" value="false">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase mb-1">商品名稱</label>
+          <input type="text" id="sell-title" required placeholder="例如: 精裝筆記本" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">售價 (金幣 🪙)</label>
+            <input type="number" id="sell-price" min="1" required placeholder="20" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">數量 / 庫存</label>
+            <input type="number" id="sell-stock" min="1" required placeholder="5" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase mb-1">商品類別</label>
+          <select id="sell-category" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option value="C2C">學生二手寄賣</option>
+            <option value="OFFICIAL">學校紀念品</option>
+            <option value="STATIONERY">文具用品</option>
+            <option value="SNACK">零食飲品</option>
+            <option value="SPORT">體育娛樂</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase mb-1">選擇圖示 (Emoji)</label>
+          <div class="flex gap-2">
+            <input type="text" id="sell-icon" value="📦" required class="w-16 text-center px-2 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-lg text-white">
+            <div class="flex items-center gap-2 overflow-x-auto custom-scrollbar py-1 text-lg">
+              <span class="cursor-pointer hover:scale-125 transition" onclick="document.getElementById('sell-icon').value='🚀'">🚀</span>
+              <span class="cursor-pointer hover:scale-125 transition" onclick="document.getElementById('sell-icon').value='📚'">📚</span>
+              <span class="cursor-pointer hover:scale-125 transition" onclick="document.getElementById('sell-icon').value='✏️'">✏️</span>
+              <span class="cursor-pointer hover:scale-125 transition" onclick="document.getElementById('sell-icon').value='🧃'">🧃</span>
+              <span class="cursor-pointer hover:scale-125 transition" onclick="document.getElementById('sell-icon').value='🏀'">🏀</span>
+              <span class="cursor-pointer hover:scale-125 transition" onclick="document.getElementById('sell-icon').value='🎮'">🎮</span>
+              <span class="cursor-pointer hover:scale-125 transition" onclick="document.getElementById('sell-icon').value='🎧'">🎧</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase mb-1">商品詳情描述</label>
+          <textarea id="sell-desc" rows="3" placeholder="簡短說明物品狀態或特色..." class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3 border-t border-slate-800 pt-4">
+          <button type="button" onclick="closeSellModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold">取消</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">發布上架</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    // --- Initial Default Data ---
+    const DEFAULT_PRODUCTS = [
+      { id: 'p1', title: '星際限定版幾何筆記本', price: 25, stock: 10, category: 'STATIONERY', icon: '📓', seller: 'OFFICIAL', sellerName: '校園官方', desc: '優質紙張，帶有隱約星空印刷', status: 'ACTIVE' },
+      { id: 'p2', title: '九成新高階科學計算機', price: 80, stock: 1, category: 'C2C', icon: '🧮', seller: '3A05', sellerName: '3A 班 (05號)', desc: '完全正常運作，附送保護殼與新電池', status: 'ACTIVE' },
+      { id: 'p3', title: '校園天文學會限量紀念章', price: 15, stock: 20, category: 'OFFICIAL', icon: '🪐', seller: 'OFFICIAL', sellerName: '校園官方', desc: '金屬質感鍍層，銀河系圖騰設計', status: 'ACTIVE' },
+      { id: 'p4', title: '全套彩虹螢光筆 (6色)', price: 18, stock: 4, category: 'C2C', icon: '🖍️', seller: '2B18', sellerName: '2B 班 (18號)', desc: '只用過一次，顏色鮮艷順暢', status: 'ACTIVE' },
+      { id: 'p5', title: '能量星空運動飲料 500ml', price: 12, stock: 15, category: 'SNACK', icon: '🧃', seller: 'OFFICIAL', sellerName: '校園官方', desc: '補充水分與體能', status: 'ACTIVE' }
+    ];
+
+    // --- State Management ---
+    let currentUser = null; // { className, studentId, isAdmin, key }
+    const db = supabase.createClient('https://csfbsmdfrsbfkunbcvrd.supabase.co', 'sb_publishable0I-Yt50supFT_JGmIXO-Kg9bMTm1GC');
+    let products = [];
+    let orders = [];
+    let userCoins = JSON.parse(localStorage.getItem('interstellar_coins')) || {};
+    let cart = []; // [{ product, qty }]
+    let knownProductIds = new Set();
+
+    async function loadData() {
+      const [p, o] = await Promise.all([
+        db.from('products').select('data').order('created_at', { ascending: false }),
+        db.from('orders').select('data').order('created_at', { ascending: false })
+      ]);
+      if (p.error || o.error) { console.error(p.error || o.error); showToast("無法連接資料庫", "錯誤"); }
+      products = (p.data || []).map(r => r.data);
+      orders = (o.data || []).map(r => r.data);
+      if (!p.error && products.length === 0) { products = DEFAULT_PRODUCTS.slice(); }
+      knownProductIds = new Set(products.map(x => x.id));
+      if (!p.error && (p.data || []).length === 0) await saveData();
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+      await loadData();
+      checkAuth();
+    });
+
+    async function saveData() {
+      localStorage.setItem('interstellar_coins', JSON.stringify(userCoins));
+      const now = Date.now();
+      const pRows = products.map((x, i) => ({ id: x.id, data: x, created_at: new Date(now - i * 1000).toISOString() }));
+      const oRows = orders.map((x, i) => ({ id: x.orderId, data: x, created_at: new Date(now - i * 1000).toISOString() }));
+      const removed = [...knownProductIds].filter(id => !products.some(x => x.id === id));
+      const ops = [];
+      if (pRows.length) ops.push(db.from('products').upsert(pRows));
+      if (oRows.length) ops.push(db.from('orders').upsert(oRows));
+      if (removed.length) ops.push(db.from('products').delete().in('id', removed));
+      const results = await Promise.all(ops);
+      const err = results.find(r => r.error);
+      if (err) { console.error(err.error); showToast("儲存到資料庫失敗", "錯誤"); }
+      knownProductIds = new Set(products.map(x => x.id));
+    }
+
+    // --- Toast Function ---
+    function showToast(msg, title = "操作成功", type = "info") {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-title').innerText = title;
+      document.getElementById('toast-msg').innerText = msg;
+      
+      toast.classList.remove('translate-x-full', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-x-full', 'opacity-0');
+      }, 3000);
+    }
+
+    // --- Authentication ---
+    function handleLogin(e) {
+      e.preventDefault();
+      const cls = document.getElementById('input-class').value.trim().toUpperCase();
+      const sid = document.getElementById('input-studentid').value.trim();
+
+      if (!cls || !sid) return;
+
+      const isAdmin = (sid === '銀河系');
+      const key = `${cls}_${sid}`;
+
+      // Initialize coin wallet (Grant 100 bonus coins if new student)
+      if (userCoins[key] === undefined) {
+        userCoins[key] = isAdmin ? 99999 : 100;
+        saveData();
+      }
+
+      currentUser = { className: cls, studentId: sid, key: key, isAdmin: isAdmin };
+      sessionStorage.setItem('interstellar_session', JSON.stringify(currentUser));
+
+      document.getElementById('login-overlay').classList.add('hidden');
+      updateHeaderUI();
+      renderShop();
+      showToast(isAdmin ? "歡迎回來，總控制員！" : `歡迎進入星際商店！獲得初始 100 星幣。`, "登入成功");
+    }
+
+    function checkAuth() {
+      const session = sessionStorage.getItem('interstellar_session');
+      if (session) {
+        currentUser = JSON.parse(session);
+        document.getElementById('login-overlay').classList.add('hidden');
+        updateHeaderUI();
+        renderShop();
+      } else {
+        document.getElementById('login-overlay').classList.remove('hidden');
+      }
+    }
+
+    function logout() {
+      currentUser = null;
+      cart = [];
+      sessionStorage.removeItem('interstellar_session');
+      document.getElementById('login-overlay').classList.remove('hidden');
+      updateCartBadge();
+    }
+
+    function updateHeaderUI() {
+      if (!currentUser) return;
+      document.getElementById('user-header-info').classList.remove('hidden');
+      document.getElementById('header-user-tag').innerText = `${currentUser.className} (${currentUser.studentId})`;
+      document.getElementById('user-coin-balance').innerText = userCoins[currentUser.key] || 0;
+
+      if (currentUser.isAdmin) {
+        document.getElementById('admin-tab-btn').classList.remove('hidden');
+      } else {
+        document.getElementById('admin-tab-btn').classList.add('hidden');
+      }
+    }
+
+    // --- Navigation Tabs ---
+    function switchTab(tab) {
+      document.getElementById('view-shop').classList.add('hidden');
+      document.getElementById('view-seller').classList.add('hidden');
+      document.getElementById('view-admin').classList.add('hidden');
+
+      if (tab === 'shop') {
+        document.getElementById('view-shop').classList.remove('hidden');
+        renderShop();
+      } else if (tab === 'seller') {
+        document.getElementById('view-seller').classList.remove('hidden');
+        renderSellerCenter();
+      } else if (tab === 'admin' && currentUser?.isAdmin) {
+        document.getElementById('view-admin').classList.remove('hidden');
+        renderAdminCenter();
+      }
+    }
+
+    // --- Shop View ---
+    function renderShop() {
+      const container = document.getElementById('product-grid');
+      const search = document.getElementById('search-input').value.toLowerCase();
+      const category = document.getElementById('category-filter').value;
+
+      const filtered = products.filter(p => {
+        if (p.status !== 'ACTIVE') return false;
+        const matchSearch = p.title.toLowerCase().includes(search) || p.desc.toLowerCase().includes(search);
+        const matchCategory = (category === 'ALL') || (category === p.category);
+        return matchSearch && matchCategory;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full text-center py-16 text-slate-500">
+            <i data-lucide="package-open" class="w-12 h-12 mx-auto mb-3 text-slate-600"></i>
+            <p class="text-sm font-medium">暫時沒有相關的商品</p>
+          </div>`;
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = filtered.map(p => `
+        <div class="glass-card rounded-2xl p-5 flex flex-col justify-between border border-slate-800 hover:border-indigo-500/40 transition group">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-3xl p-3 rounded-2xl bg-slate-900/80 border border-slate-800 group-hover:scale-110 transition duration-300 inline-block">${p.icon}</span>
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${p.seller === 'OFFICIAL' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'}">
+                ${p.sellerName}
+              </span>
+            </div>
+            <h3 class="font-bold text-white text-base mb-1 group-hover:text-indigo-300 transition">${p.title}</h3>
+            <p class="text-xs text-slate-400 line-clamp-2 mb-4">${p.desc || '無詳細描述'}</p>
+          </div>
+
+          <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+            <div>
+              <p class="text-[10px] text-slate-500">價格</p>
+              <p class="font-black orbitron text-amber-400 text-lg">🪙 ${p.price}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-[10px] text-slate-500">剩餘: ${p.stock}</p>
+              <button onclick="addToCart('${p.id}')" ${p.stock <= 0 ? 'disabled' : ''} class="mt-1 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-xs font-bold transition flex items-center gap-1.5">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>${p.stock > 0 ? '加入購物籃' : '已售罄'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      lucide.createIcons();
+    }
+
+    // --- Cart & Checkout ---
+    function addToCart(productId) {
+      const p = products.find(x => x.id === productId);
+      if (!p || p.stock <= 0) return;
+
+      const existing = cart.find(x => x.product.id === productId);
+      if (existing) {
+        if (existing.qty < p.stock) {
+          existing.qty++;
+        } else {
+          showToast("已達到該商品最高庫存限制", "提示", "warning");
+          return;
+        }
+      } else {
+        cart.push({ product: p, qty: 1 });
+      }
+
+      updateCartBadge();
+      showToast(`已將 "${p.title}" 加入購物籃`);
+    }
+
+    function updateCartBadge() {
+      const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+      const badge = document.getElementById('cart-badge');
+      if (totalQty > 0) {
+        badge.innerText = totalQty;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    function openCartModal() {
+      renderCartUI();
+      document.getElementById('cart-modal').classList.remove('hidden');
+    }
+
+    function closeCartModal() {
+      document.getElementById('cart-modal').classList.add('hidden');
+    }
+
+    function renderCartUI() {
+      const container = document.getElementById('cart-items-container');
+      if (cart.length === 0) {
+        container.innerHTML = `<p class="text-center text-xs text-slate-500 py-6">購物籃內暫無商品</p>`;
+        document.getElementById('cart-total-price').innerText = "0";
+        return;
+      }
+
+      let total = 0;
+      container.innerHTML = cart.map(item => {
+        const itemTotal = item.product.price * item.qty;
+        total += itemTotal;
+        return `
+          <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">${item.product.icon}</span>
+              <div>
+                <p class="font-bold text-white">${item.product.title}</p>
+                <p class="text-slate-400">🪙 ${item.product.price} × ${item.qty}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="font-bold orbitron text-amber-400">🪙 ${itemTotal}</span>
+              <button onclick="removeFromCart('${item.product.id}')" class="text-rose-400 hover:text-rose-300 p-1">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('cart-total-price').innerText = total;
+      lucide.createIcons();
+    }
+
+    function removeFromCart(productId) {
+      cart = cart.filter(x => x.product.id !== productId);
+      updateCartBadge();
+      renderCartUI();
+    }
+
+    function checkoutCart() {
+      if (cart.length === 0) {
+        showToast("購物籃是空的", "警告", "warning");
+        return;
+      }
+
+      const email = document.getElementById('cart-email').value.trim();
+      if (!email) {
+        showToast("請輸入有效的電郵地址", "警告", "warning");
+        return;
+      }
+
+      const totalCost = cart.reduce((sum, item) => sum + (item.product.price * item.qty), 0);
+      const currentCoins = userCoins[currentUser.key] || 0;
+
+      if (currentCoins < totalCost) {
+        showToast("星幣餘額不足！請先寄賣商品賺取金幣。", "失敗", "error");
+        return;
+      }
+
+      // Deduct balance from buyer
+      userCoins[currentUser.key] -= totalCost;
+
+      // Process each item purchase
+      cart.forEach(item => {
+        const p = products.find(x => x.id === item.product.id);
+        if (p) {
+          p.stock -= item.qty;
+          
+          // Transfer coins to seller if it's C2C
+          if (p.seller !== 'OFFICIAL' && userCoins[p.seller] !== undefined) {
+            userCoins[p.seller] += (p.price * item.qty);
+          }
+        }
+      });
+
+      // Record Order
+      const newOrder = {
+        orderId: 'ORD-' + Date.now().toString().slice(-6),
+        timestamp: new Date().toLocaleString('zh-HK'),
+        buyerKey: currentUser.key,
+        buyerClass: currentUser.className,
+        buyerStudentId: currentUser.studentId,
+        buyerEmail: email,
+        items: cart.map(i => `${i.product.title} (x${i.qty})`).join(', '),
+        totalAmount: totalCost
+      };
+
+      orders.unshift(newOrder);
+      saveData();
+
+      cart = [];
+      updateCartBadge();
+      updateHeaderUI();
+      closeCartModal();
+      renderShop();
+
+      showToast("購買成功！商品將會安排發貨。", "結帳成功");
+    }
+
+    // --- Personal Seller Center ---
+    function renderSellerCenter() {
+      document.getElementById('seller-stat-coins').innerText = userCoins[currentUser.key] || 0;
+
+      const myItems = products.filter(p => p.seller === currentUser.key);
+      document.getElementById('seller-stat-items').innerText = myItems.length;
+
+      const mySalesCount = orders.filter(o => o.items.includes(currentUser.className)).length; 
+      document.getElementById('seller-stat-sales').innerText = mySalesCount;
+
+      // Render My Items Table
+      const tableBody = document.getElementById('seller-items-table');
+      if (myItems.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500">你尚未寄賣任何商品</td></tr>`;
+      } else {
+        tableBody.innerHTML = myItems.map(p => `
+          <tr class="hover:bg-slate-900/40">
+            <td class="px-6 py-4 flex items-center gap-3">
+              <span class="text-2xl">${p.icon}</span>
+              <div>
+                <p class="font-bold text-white">${p.title}</p>
+                <p class="text-[10px] text-slate-500">${p.desc || ''}</p>
+              </div>
+            </td>
+            <td class="px-6 py-4 font-bold orbitron text-amber-400">🪙 ${p.price}</td>
+            <td class="px-6 py-4 font-bold">${p.stock} 件</td>
+            <td class="px-6 py-4">
+              <span class="px-2 py-0.5 rounded text-[10px] ${p.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500'}">
+                ${p.status === 'ACTIVE' ? '上架中' : '已下架'}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-right">
+              <button onclick="toggleProductStatus('${p.id}')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium">
+                ${p.status === 'ACTIVE' ? '下架' : '重新上架'}
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // Render Personal Orders Table
+      const myOrders = orders.filter(o => o.buyerKey === currentUser.key);
+      const ordersTable = document.getElementById('my-orders-table');
+      if (myOrders.length === 0) {
+        ordersTable.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500">暫無購買紀錄</td></tr>`;
+      } else {
+        ordersTable.innerHTML = myOrders.map(o => `
+          <tr class="hover:bg-slate-900/40">
+            <td class="px-6 py-4">
+              <p class="font-bold text-indigo-300 orbitron">${o.orderId}</p>
+              <p class="text-[10px] text-slate-500">${o.timestamp}</p>
+            </td>
+            <td class="px-6 py-4 text-slate-200">${o.items}</td>
+            <td class="px-6 py-4 font-bold orbitron text-amber-400">🪙 ${o.totalAmount}</td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    // --- Add / Sell Product Modal ---
+    function openSellModal(isAdminAdd = false) {
+      document.getElementById('sell-is-admin').value = isAdminAdd ? "true" : "false";
+      document.getElementById('sell-modal-title').innerText = isAdminAdd ? "新增官方商品" : "寄賣新商品";
+      document.getElementById('sell-modal').classList.remove('hidden');
+    }
+
+    function closeSellModal() {
+      document.getElementById('sell-modal').classList.add('hidden');
+      document.getElementById('sell-form').reset();
+    }
+
+    function handleSellSubmit(e) {
+      e.preventDefault();
+      const isAdminAdd = document.getElementById('sell-is-admin').value === "true";
+      const title = document.getElementById('sell-title').value.trim();
+      const price = parseInt(document.getElementById('sell-price').value);
+      const stock = parseInt(document.getElementById('sell-stock').value);
+      const category = document.getElementById('sell-category').value;
+      const icon = document.getElementById('sell-icon').value.trim() || '📦';
+      const desc = document.getElementById('sell-desc').value.trim();
+
+      const newProduct = {
+        id: 'p-' + Date.now(),
+        title: title,
+        price: price,
+        stock: stock,
+        category: category,
+        icon: icon,
+        desc: desc,
+        seller: isAdminAdd ? 'OFFICIAL' : currentUser.key,
+        sellerName: isAdminAdd ? '校園官方' : `${currentUser.className} 班 (${currentUser.studentId}號)`,
+        status: 'ACTIVE'
+      };
+
+      products.unshift(newProduct);
+      saveData();
+      closeSellModal();
+
+      if (isAdminAdd) {
+        renderAdminCenter();
+      } else {
+        renderSellerCenter();
+      }
+      renderShop();
+      showToast("商品已成功發布！");
+    }
+
+    function toggleProductStatus(productId) {
+      const p = products.find(x => x.id === productId);
+      if (p) {
+        p.status = (p.status === 'ACTIVE') ? 'INACTIVE' : 'ACTIVE';
+        saveData();
+        renderSellerCenter();
+        if (currentUser.isAdmin) renderAdminCenter();
+        renderShop();
+        showToast(`商品狀態已更新為：${p.status === 'ACTIVE' ? '上架中' : '已下架'}`);
+      }
+    }
+
+    // --- Admin Secret Center ---
+    function renderAdminCenter() {
+      // Render Inventory Table
+      const invBody = document.getElementById('admin-inventory-table');
+      invBody.innerHTML = products.map(p => `
+        <tr class="hover:bg-slate-900/40">
+          <td class="px-6 py-4 flex items-center gap-3">
+            <span class="text-2xl">${p.icon}</span>
+            <div>
+              <p class="font-bold text-white">${p.title}</p>
+              <p class="text-[10px] text-slate-500">ID: ${p.id}</p>
+            </div>
+          </td>
+          <td class="px-6 py-4">
+            <span class="px-2 py-0.5 rounded text-[10px] ${p.seller === 'OFFICIAL' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-purple-500/20 text-purple-300'}">
+              ${p.sellerName}
+            </span>
+          </td>
+          <td class="px-6 py-4 font-bold orbitron text-amber-400">🪙 ${p.price}</td>
+          <td class="px-6 py-4">
+            <input type="number" value="${p.stock}" min="0" onchange="updateProductStock('${p.id}', this.value)" class="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-xs text-white">
+          </td>
+          <td class="px-6 py-4">
+            <span class="px-2 py-0.5 rounded text-[10px] ${p.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">
+              ${p.status === 'ACTIVE' ? '上架中' : '已下架'}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-right space-x-2">
+            <button onclick="toggleProductStatus('${p.id}')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs">
+              ${p.status === 'ACTIVE' ? '下架' : '上架'}
+            </button>
+            <button onclick="deleteProduct('${p.id}')" class="px-2.5 py-1 rounded bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 text-xs">
+              刪除
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      // Render Admin Orders Table
+      const ordBody = document.getElementById('admin-orders-table');
+      document.getElementById('admin-order-count').innerText = `${orders.length} 筆紀錄`;
+
+      if (orders.length === 0) {
+        ordBody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500">暫無任何訂單交易紀錄</td></tr>`;
+      } else {
+        ordBody.innerHTML = orders.map(o => `
+          <tr class="hover:bg-slate-900/40">
+            <td class="px-6 py-4">
+              <p class="font-bold text-indigo-300 orbitron">${o.orderId}</p>
+              <p class="text-[10px] text-slate-500">${o.timestamp}</p>
+            </td>
+            <td class="px-6 py-4 font-bold text-slate-200">
+              ${o.buyerClass} 班 (${o.buyerStudentId}號)
+            </td>
+            <td class="px-6 py-4 text-slate-300 font-mono">
+              ${o.buyerEmail}
+            </td>
+            <td class="px-6 py-4 text-slate-200">${o.items}</td>
+            <td class="px-6 py-4 font-bold orbitron text-amber-400">🪙 ${o.totalAmount}</td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    function switchAdminSubTab(sub) {
+      if (sub === 'inventory') {
+        document.getElementById('admin-subview-inv').classList.remove('hidden');
+        document.getElementById('admin-subview-ord').classList.add('hidden');
+        document.getElementById('admin-tab-inv').className = "pb-3 text-indigo-400 border-b-2 border-indigo-500 font-bold";
+        document.getElementById('admin-tab-ord').className = "pb-3 text-slate-400 border-b-2 border-transparent font-bold";
+      } else {
+        document.getElementById('admin-subview-inv').classList.add('hidden');
+        document.getElementById('admin-subview-ord').classList.remove('hidden');
+        document.getElementById('admin-tab-inv').className = "pb-3 text-slate-400 border-b-2 border-transparent font-bold";
+        document.getElementById('admin-tab-ord').className = "pb-3 text-indigo-400 border-b-2 border-indigo-500 font-bold";
+      }
+    }
+
+    function updateProductStock(productId, newStock) {
+      const p = products.find(x => x.id === productId);
+      if (p) {
+        p.stock = parseInt(newStock) || 0;
+        saveData();
+        showToast("商品庫存已更新");
+      }
+    }
+
+    function deleteProduct(productId) {
+      if (confirm("確定要刪除這件商品嗎？")) {
+        products = products.filter(x => x.id !== productId);
+        saveData();
+        renderAdminCenter();
+        renderShop();
+        showToast("商品已刪除");
+      }
+    }
+  </script>
+</body>
+</html>
